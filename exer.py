@@ -16,6 +16,7 @@ spamdictionarycount = 0
 count = 1
 
 
+
 #--------------------- RETRIEVE WORDS -------------------------#
 
 def getAllWords(txtfile,filecontent):
@@ -31,9 +32,6 @@ def getAllWords(txtfile,filecontent):
 
     file.close()
 
-     #WRITE RESULTS IN AN OUTPUT FILE
-    f = open("output.out", "w")
-
     #REMOVING THE NON-ALPHANUMERIC CHARACTERS
     for text in filecontent:
         newtext = re.sub('[^a-zA-Z0-9]', '', text.lower())
@@ -43,11 +41,7 @@ def getAllWords(txtfile,filecontent):
     while("" in filecontent):
         filecontent.remove("")
 
-    for i in sorted(filecontent):
-        f.write(i +"\n")
-        
-    f.close()
-        
+ 
 # --------------------- BOG FUNCTION --------------------- #
 def bog(filecontent,bagofwords,totalwords,dictionarycount):
     
@@ -65,7 +59,7 @@ def bog(filecontent,bagofwords,totalwords,dictionarycount):
     for i in bagofwords.keys():
         dictionarycount = dictionarycount  + 1
 
-    return dictionarycount
+    return [totalwords,dictionarycount]
         
     # for i in bagofwords.keys():
     #     print(i)   
@@ -85,25 +79,34 @@ def bog(filecontent,bagofwords,totalwords,dictionarycount):
 
 
 # -------------------- GET SPAM/HAM PROBABILITY ------------------- #
-def classifySpamHam(text,bagofwords,dictionarycount):
+def classifySpamHam(text,bagofwords,totalwords,dictionarycount):
 
     #list of the probability of each word found in the spam data
     probabilityList = []
 
     # stores the spam probability of the file 
     prob = 1    
-
+    newwords = 0
+    
+    # count words present in the message to be classified but does not exist in the dictionary
+    for word in text:
+        if word not in bagofwords.keys():
+            newwords = newwords + 1
+            
     #search for the word in the dictionary
     for word in text:
         if word in bagofwords.keys():
-            ans = bagofwords[word]/dictionarycount
-            probabilityList.append(ans)
+            ans = (bagofwords[word]+1)/(totalwords + (1*(dictionarycount+newwords)))
+        if word not in bagofwords.keys():
+            ans = 1/(totalwords + (1*(dictionarycount+newwords)))
+        
+        probabilityList.append(ans)
     
     for i in probabilityList:
         prob = prob * i
 
+    print(prob)
     return prob
-
 
 
 
@@ -119,7 +122,9 @@ for file in sorted(hamData):
     pathA = "/workspaces/cmsc170-exer05-template/data/data01/ham/"+file
     getAllWords(pathA,filecontent)
 
-hamdictionarycount = bog(filecontent,hambagofwords,hamtotalwords,hamdictionarycount)
+haminfo = bog(filecontent,hambagofwords,hamtotalwords,hamdictionarycount)
+hamtotalwords = haminfo[0]
+hamdictionarycount = haminfo[1]
     
 filecontent.clear()
 
@@ -127,7 +132,10 @@ for file in sorted(spamData):
     pathB = "/workspaces/cmsc170-exer05-template/data/data01/spam/"+file
     getAllWords(pathB,filecontent)
 
-spamdictionarycount = bog(filecontent,spambagofwords,spamtotalwords,spamdictionarycount)
+spaminfo = bog(filecontent,spambagofwords,spamtotalwords,spamdictionarycount)
+spamtotalwords = spaminfo[0]
+print(spamtotalwords)
+spamdictionarycount = spaminfo[1]
 
 filecontent.clear()
 
@@ -139,10 +147,20 @@ for file in sorted(classifyData):
     getAllWords(pathC,filecontent)
     #remove duplicates in the classifydata
     classifywords = sorted(list(dict.fromkeys(filecontent)))
-    spamProbability = classifySpamHam(classifywords,spambagofwords,spamdictionarycount)
-    hamProbability = classifySpamHam(classifywords,hambagofwords,hamdictionarycount)
-    f.writelines(str(count) + " SPAM: " + str(spamProbability) + " HAM: " + str(hamProbability) + "\n")
+    spamProbability = classifySpamHam(classifywords,spambagofwords,spamtotalwords,spamdictionarycount)
+    hamProbability = classifySpamHam(classifywords,hambagofwords,hamtotalwords,hamdictionarycount)
+    # f.writelines(repr(count) + " SPAM: " + repr(spamProbability) + " HAM: " + repr(hamProbability) + "\n")
     
+    
+    if spamProbability > hamProbability:
+        f.writelines(str(count) +" SPAM "+ str(spamProbability)+"\n")
+        count = count + 1
+
+    elif hamProbability < spamProbability:
+        f.writelines(str(count) +" HAM "+ str(spamProbability)+"\n")
+        count = count + 1
+
+
     # update counter
     count = count + 1
 
@@ -153,14 +171,6 @@ for file in sorted(classifyData):
 
     
 
-
-    # if spamProbability > hamProbability:
-    #     f.write(count +" SPAM "+ spamProbability+"\n")
-    #     count = count + 1
-
-    # elif hamProbability < spamProbability:
-    #     f.write(count +" HAM "+ spamProbability+"\n")
-    #     count = count + 1
 
 
 f.close()
